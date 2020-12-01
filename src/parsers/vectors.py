@@ -1,3 +1,4 @@
+from config import DATA_PATH
 from exceptions import FileParsingFailureException
 
 class Vector:
@@ -6,8 +7,9 @@ class Vector:
         self.values = [float(val) for val in text_data.replace('  ', ' ').split(' ')]
 
 
-def parse(file_path):
+def parse(filename):
     try:
+        file_path = os.path.join(DATA_PATH, filename)
         with open(file_path, 'r') as f:
             content = f.read().strip()
 

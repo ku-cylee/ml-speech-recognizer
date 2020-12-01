@@ -1,3 +1,4 @@
+from config import DATA_PATH
 from exceptions import FileParsingFailureException
 
 class PhenomenonModel:
@@ -51,8 +52,9 @@ class TransitionTable:
         self.probabilities = [[float(prob) for prob in row.strip().split(' ')] for row in text_data.split('\n')[1:-1]]
 
 
-def parse(file_path):
+def parse():
     try:
+        file_path = os.path.join(DATA_PATH, 'hmm.txt')
         with open(file_path, 'r') as f:
             content = f.read()
 
