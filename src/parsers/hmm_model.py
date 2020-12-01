@@ -1,4 +1,4 @@
-from config import DATA_PATH
+from config import HMM_PATH
 from exceptions import FileParsingFailureException
 
 class PhenomenonModel:
@@ -54,11 +54,10 @@ class TransitionTable:
 
 def parse():
     try:
-        file_path = os.path.join(DATA_PATH, 'hmm.txt')
-        with open(file_path, 'r') as f:
+        with open(HMM_PATH, 'r') as f:
             content = f.read()
 
         pheno_models = [PhenomenonModel(text.strip()) for text in content.split('~h')[1:]]
         return pheno_models
     except:
-        raise FileParsingFailureException('HMM Model', file_path)
+        raise FileParsingFailureException('HMM Model', HMM_PATH)
