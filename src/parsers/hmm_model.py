@@ -1,5 +1,3 @@
-import json
-
 from exceptions import FileParsingFailureException
 
 class PhenomenonModel:
@@ -53,7 +51,7 @@ class TransitionTable:
         self.probabilities = [[float(prob) for prob in row.strip().split(' ')] for row in text_data.split('\n')[1:-1]]
 
 
-def parse_hmm_model(file_path):
+def parse(file_path):
     try:
         with open(file_path, 'r') as f:
             content = f.read()
