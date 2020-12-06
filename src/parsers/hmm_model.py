@@ -23,7 +23,10 @@ class Mixture:
     def __init__(self, text_data):
         is_mean_line = False
         is_variance_line = False
-        for line in text_data.split('\n'):
+        for idx, line in enumerate(text_data.split('\n')):
+            if idx == 0:
+                self.weight = float(line.split(' ')[-1])
+
             if is_mean_line:
                 means = [float(mean) for mean in line.strip().split(' ')]
                 is_mean_line = False

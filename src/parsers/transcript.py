@@ -23,7 +23,6 @@ def parse():
             content = f.read()
 
         transcripts = [Transcript(match) for match in PTR.finditer(content)]
-        transcripts[0].get_vectors()
         return transcripts
     except:
         raise FileParsingFailureException('Vector', file_path)
