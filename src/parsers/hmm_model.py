@@ -1,3 +1,7 @@
+import math
+
+import lib
+
 from config import HMM_PATH
 from exceptions import FileParsingFailureException
 
@@ -16,6 +20,10 @@ class State:
     def __init__(self, text_data):
         self.id = int(text_data.split('\n')[0])
         self.mixtures = [Mixture(text.strip()) for text in text_data.split('<MIXTURE>')[1:]]
+
+
+    def get_observation_prob(self, x):
+        return lib.sum_logs(mixture.get_indiv_observation_prob(x) for mixture in self.mixtures)
 
 
 class Mixture:
@@ -42,12 +50,24 @@ class Mixture:
         self.gaussians = [Gaussian(means[i], variances[i]) for i in range(self.dimension)]
 
 
+    def get_indiv_observation_prob(self, vector):
+        log_weight = math.log(self.weight)
+        constant = 0.5 * self.dimension * math.log(2 * math.pi)
+        variances_sum = sum(math.log(gaussian.variance) for gaussian in self.gaussians)
+
+        differences_sum = 0
+        for i in range(self.dimension):
+            gaussian = self.gaussians[i]
+            differences_sum = ((vector[i] - gaussian.mean) / gaussian.variance) ** 2
+            
+        return log_weight - constant - variances_sum - 0.5 * differences_sum
+
+
 class Gaussian:
 
     def __init__(self, mean, variance):
         self.mean = mean
         self.variance = variance
-
 
 class TransitionTable:
 
@@ -56,11 +76,11 @@ class TransitionTable:
 
 
 def parse():
-    try:
-        with open(HMM_PATH, 'r') as f:
-            content = f.read()
+    with open(HMM_PATH, 'r') as f:
+        content = f.read()
 
-        pheno_models = [PhenomenonModel(text.strip()) for text in content.split('~h')[1:]]
-        return pheno_models
-    except:
-        raise FileParsingFailureException('HMM Model', HMM_PATH)
+    pheno_models_list = [PhenomenonModel(text.strip()) for text in content.split('~h')[1:]]
+    pheno_models = dict()
+    for pheno in pheno_models_list:
+        pheno_models[pheno.phenomenon] = pheno
+    return pheno_models

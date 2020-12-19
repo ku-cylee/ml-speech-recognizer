@@ -10,7 +10,7 @@ class Transcript:
 
     def __init__(self, match):
         self.filename = match.group(1).replace('.lab', '.txt')
-        self.monophones = match.group(2).split('\n')
+        self.monophones = match.group(2).split('\n')[:-1]
 
     
     def get_vectors(self):
