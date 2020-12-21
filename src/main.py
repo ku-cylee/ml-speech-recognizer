@@ -56,7 +56,7 @@ def get_forward_table(states, vectors, trans_table):
         fw_table.append([lib.NEG_INF] * len(states))
 
     for sidx, state in enumerate(states):
-        observ_prob = get_observation_prob(state, vectors[0])
+        observ_prob = state.get_observ_prob(vectors[0])
         fw_prob = trans_table[0][sidx] + observ_prob
         fw_table[0][sidx] = fw_prob
 
@@ -64,7 +64,7 @@ def get_forward_table(states, vectors, trans_table):
         vector = vectors[time]
         for sidx, state in enumerate(states):
             prev_vals = [fw_table[time - 1][i] + trans_table[i + 1][sidx + 1] for i in range(len(states))]
-            observ_prob = get_observation_prob(state, vector)
+            observ_prob = state.get_observ_prob(vector)
             fw_table[time][sidx] = lib.sum_logs(prev_vals) + observ_prob
 
     return fw_table
@@ -84,22 +84,22 @@ def get_backward_table(states, vectors, trans_table):
             values = []
             for nsidx, nstate in enumerate(states):
                 trans_prob = trans_table[psidx + 1][nsidx + 1]
-                observ_prob = get_observation_prob(nstate, vector)
+                observ_prob = nstate.get_observ_prob(vector)
                 bw_prob = bw_table[time + 1][nsidx]
                 values.append(trans_prob + bw_prob + observ_prob)
 
-            bw_table[time - 1][psidx] = lib.sum_logs(values)
-            print(time, psidx)
+            res = lib.sum_logs(values)
+            bw_table[time - 1][psidx] = res
+            print(time, psidx, res)
 
     return bw_table
 
 
 def get_observation_prob(state, vector):
-    return lib.sum_logs([get_indiv_observation_prob(mixture, vector) for mixture in state.mixtures])
+    return lib.sum_logs([mix.get_observ_prob(vector) for mix in state.mixtures])
 
 
 def get_indiv_observation_prob(mixture, vector):
-    log_weight = math.log(mixture.weight)
     constant = 0.5 * mixture.dimension * math.log(2 * math.pi)
     variances_sum = sum(math.log(gaussian.variance) for gaussian in mixture.gaussians)
 
@@ -108,7 +108,7 @@ def get_indiv_observation_prob(mixture, vector):
         gaussian = mixture.gaussians[i]
         differences_sum = ((vector.values[i] - gaussian.mean) / gaussian.variance) ** 2
         
-    return log_weight - constant - variances_sum - 0.5 * differences_sum
+    return mixture.weight - constant - variances_sum - 0.5 * differences_sum
 
 
 def main():

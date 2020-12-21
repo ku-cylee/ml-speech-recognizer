@@ -21,6 +21,9 @@ class State:
         self.id = int(text_data.split('\n')[0])
         self.mixtures = [Mixture(text.strip()) for text in text_data.split('<MIXTURE>')[1:]]
 
+    def get_observ_prob(self, vector):
+        return lib.sum_logs([mix.get_indiv_observ_prob(vector) for mix in self.mixtures])
+
 
 class Mixture:
 
@@ -29,7 +32,7 @@ class Mixture:
         is_variance_line = False
         for idx, line in enumerate(text_data.split('\n')):
             if idx == 0:
-                self.weight = float(line.split(' ')[-1])
+                self.weight = lib.refined_log(float(line.split(' ')[-1]))
 
             if is_mean_line:
                 means = [float(mean) for mean in line.strip().split(' ')]
@@ -44,6 +47,22 @@ class Mixture:
 
         self.dimension = len(means)
         self.gaussians = [Gaussian(means[i], variances[i]) for i in range(self.dimension)]
+
+        self.calc_params()
+
+
+    def calc_params(self):
+        constant = 0.5 * self.dimension * math.log(2 * math.pi)
+        variances_sum = sum(lib.refined_log(gauss.variance) for gauss in self.gaussians)
+        self.param = self.weight - constant - variances_sum
+
+
+    def get_indiv_observ_prob(self, vector):
+        differences_sum = 0
+        for idx, gaussian in enumerate(self.gaussians):
+            differences_sum += ((vector.values[idx] - gaussian.mean) / gaussian.variance) ** 2
+
+        return self.param - 0.5 * differences_sum
 
 
 class Gaussian:
