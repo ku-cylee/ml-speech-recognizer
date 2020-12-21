@@ -22,6 +22,7 @@ def accumulate(model, transcripts):
     vectors = transcript.get_vectors()
     forward_table = get_forward_table(states, vectors, pheno_trans_table)
     backward_table = get_backward_table(states, vectors, pheno_trans_table)
+    likelihood = get_likelihood(forward_table, pheno_trans_table, states)
 
 
 def get_transcript_transition_table(models, total_states_count):
@@ -90,25 +91,15 @@ def get_backward_table(states, vectors, trans_table):
 
             res = lib.sum_logs(values)
             bw_table[time - 1][psidx] = res
-            print(time, psidx, res)
 
     return bw_table
 
 
-def get_observation_prob(state, vector):
-    return lib.sum_logs([mix.get_observ_prob(vector) for mix in state.mixtures])
-
-
-def get_indiv_observation_prob(mixture, vector):
-    constant = 0.5 * mixture.dimension * math.log(2 * math.pi)
-    variances_sum = sum(math.log(gaussian.variance) for gaussian in mixture.gaussians)
-
-    differences_sum = 0
-    for i in range(mixture.dimension):
-        gaussian = mixture.gaussians[i]
-        differences_sum = ((vector.values[i] - gaussian.mean) / gaussian.variance) ** 2
-        
-    return mixture.weight - constant - variances_sum - 0.5 * differences_sum
+def get_likelihood(forward_table, trans_table, states):
+    values = []
+    for idx in range(len(states)):
+        values.append(forward_table[-1][idx] + forward_table[idx + 1][-1])
+    return lib.sum_logs(values)
 
 
 def main():
