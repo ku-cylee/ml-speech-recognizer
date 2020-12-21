@@ -20,7 +20,8 @@ def accumulate(model, transcripts):
 
     pheno_trans_table = get_transcript_transition_table(models, len(states))
     vectors = transcript.get_vectors()
-    forward_table = get_forward_table(states, vectors, model_transition_table)
+    forward_table = get_forward_table(states, vectors, pheno_trans_table)
+    backward_table = get_backward_table(states, vectors, pheno_trans_table)
 
 
 def get_transcript_transition_table(models, total_states_count):
@@ -50,22 +51,47 @@ def get_transcript_transition_table(models, total_states_count):
 
 
 def get_forward_table(states, vectors, trans_table):
-    fw_table = [[]]
+    fw_table = []
+    for _ in range(len(vectors)):
+        fw_table.append([lib.NEG_INF] * len(states))
 
     for sidx, state in enumerate(states):
         observ_prob = get_observation_prob(state, vectors[0])
         fw_prob = trans_table[0][sidx] + observ_prob
-        fw_table[0].append(fw_prob)
+        fw_table[0][sidx] = fw_prob
 
     for time in range(1, len(vectors)):
         vector = vectors[time]
-        fw_table.append([])
         for sidx, state in enumerate(states):
-            prev_vals = [fw_table[time - 1][i] + trans_table[i][sidx] for i in range(len(states))]
+            prev_vals = [fw_table[time - 1][i] + trans_table[i + 1][sidx + 1] for i in range(len(states))]
             observ_prob = get_observation_prob(state, vector)
-            fw_table[time].append(lib.sum_logs(prev_vals) + observ_prob)
+            fw_table[time][sidx] = lib.sum_logs(prev_vals) + observ_prob
 
     return fw_table
+
+
+def get_backward_table(states, vectors, trans_table):
+    bw_table = []
+    for _ in range(len(vectors)):
+        bw_table.append([lib.NEG_INF] * len(states))
+
+    for sidx in range(len(states)):
+        bw_table[-1][sidx] = trans_table[sidx + 1][len(states) + 1]
+
+    for time in range(len(vectors) - 2, 0, -1):
+        vector = vectors[time]
+        for psidx in range(len(states)):
+            values = []
+            for nsidx, nstate in enumerate(states):
+                trans_prob = trans_table[psidx + 1][nsidx + 1]
+                observ_prob = get_observation_prob(nstate, vector)
+                bw_prob = bw_table[time + 1][nsidx]
+                values.append(trans_prob + bw_prob + observ_prob)
+
+            bw_table[time - 1][psidx] = lib.sum_logs(values)
+            print(time, psidx)
+
+    return bw_table
 
 
 def get_observation_prob(state, vector):
