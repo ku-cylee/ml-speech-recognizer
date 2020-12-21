@@ -6,108 +6,117 @@ import parsers.hmm_model as hmm_model
 import parsers.transcript as transcript
 import parsers.vectors as vectors
 
-def accumulate(model, transcripts):
-    a = 0
-    mean = 0
-    variance = 0
-    state_occupancy = 0
+class Accumulator:
 
-    transcript = transcripts[0]
-    models = [model[mp] for mp in transcript.monophones]
-    states = []
-    for model in models:
-        states += model.states
-
-    pheno_trans_table = get_transcript_transition_table(models, len(states))
-    vectors = transcript.get_vectors()
-    forward_table = get_forward_table(states, vectors, pheno_trans_table)
-    backward_table = get_backward_table(states, vectors, pheno_trans_table)
-    likelihood = get_likelihood(forward_table, pheno_trans_table, states)
+    def __init__(self, model):
+        self.model = model
 
 
-def get_transcript_transition_table(models, total_states_count):
-    table = []
-    for _ in range(total_states_count + 2):
-        table.append([lib.NEG_INF] * (total_states_count + 2))
+    def process_transcript(self, transcript):
+        self.transcript_models = [self.model[mp] for mp in transcript.monophones]
+        self.states = []
+        for model in self.transcript_models:
+            self.states += model.states
+        self.vectors = transcript.get_vectors()
+        self.states_count = len(self.states)
+        self.vectors_count = len(self.vectors)
+        
+        self.pheno_trans_table = self.calc_transition_table()
+        print('TRANS TABLE COMPLETE')
+        self.forward_table = self.calc_forward_table()
+        print('FORWARD TABLE COMPLETE')
+        self.backward_table = self.calc_backward_table()
+        print('BACKWARD TABLE COMPLETE')
+        self.likelihood = self.calc_likelihood()
 
-    cursor = 0
-    table[0][1] = 0
-    for model in models:
-        states_count = len(model.states)
-        trans_table = model.transition_table.probabilities
 
-        for j in range(1, states_count + 2):
-            previous_prob = table[cursor][cursor + 1]
-            table[cursor][cursor + j] = previous_prob + trans_table[0][j]
+    def calc_transition_table(self):
+        table = []
+        for _ in range(self.states_count + 2):
+            table.append([lib.NEG_INF] * (self.states_count + 2))
 
-        for i in range(1, states_count + 2):
+        cursor = 0
+        table[0][1] = 0
+        for model in self.transcript_models:
+            states_count = len(model.states)
+            trans_table = model.transition_table.probabilities
+
             for j in range(1, states_count + 2):
-                table[cursor + i][cursor + j] = trans_table[i][j]
+                previous_prob = table[cursor][cursor + 1]
+                table[cursor][cursor + j] = previous_prob + trans_table[0][j]
 
-        cursor += states_count
+            for i in range(1, states_count + 2):
+                for j in range(1, states_count + 2):
+                    table[cursor + i][cursor + j] = trans_table[i][j]
 
-    table[total_states_count][total_states_count + 1] = 0
+            cursor += states_count
 
-    return table
-
-
-def get_forward_table(states, vectors, trans_table):
-    fw_table = []
-    for _ in range(len(vectors)):
-        fw_table.append([lib.NEG_INF] * len(states))
-
-    for sidx, state in enumerate(states):
-        observ_prob = state.get_observ_prob(vectors[0])
-        fw_prob = trans_table[0][sidx] + observ_prob
-        fw_table[0][sidx] = fw_prob
-
-    for time in range(1, len(vectors)):
-        vector = vectors[time]
-        for sidx, state in enumerate(states):
-            prev_vals = [fw_table[time - 1][i] + trans_table[i + 1][sidx + 1] for i in range(len(states))]
-            observ_prob = state.get_observ_prob(vector)
-            fw_table[time][sidx] = lib.sum_logs(prev_vals) + observ_prob
-
-    return fw_table
+        table[-2][-1] = 0
+        return table
 
 
-def get_backward_table(states, vectors, trans_table):
-    bw_table = []
-    for _ in range(len(vectors)):
-        bw_table.append([lib.NEG_INF] * len(states))
+    def calc_forward_table(self):
+        fw_table = []
+        for _ in range(self.vectors_count):
+            fw_table.append([lib.NEG_INF] * self.states_count)
 
-    for sidx in range(len(states)):
-        bw_table[-1][sidx] = trans_table[sidx + 1][len(states) + 1]
+        for sidx, state in enumerate(self.states):
+            observ_prob = state.get_observ_prob(self.vectors[0])
+            fw_prob = self.pheno_trans_table[0][sidx] + observ_prob
+            fw_table[0][sidx] = fw_prob
 
-    for time in range(len(vectors) - 2, 0, -1):
-        vector = vectors[time]
-        for psidx in range(len(states)):
-            values = []
-            for nsidx, nstate in enumerate(states):
-                trans_prob = trans_table[psidx + 1][nsidx + 1]
-                observ_prob = nstate.get_observ_prob(vector)
-                bw_prob = bw_table[time + 1][nsidx]
-                values.append(trans_prob + bw_prob + observ_prob)
+        for time in range(1, self.vectors_count):
+            vector = self.vectors[time]
+            for psidx, state in enumerate(self.states):
+                values = []
+                for nsidx in range(self.states_count):
+                    fw_prob = fw_table[time - 1][nsidx]
+                    trans_prob = self.pheno_trans_table[nsidx + 1][psidx + 1]
+                    values.append(fw_prob + trans_prob)
+                observ_prob = state.get_observ_prob(vector)
+                fw_table[time][psidx] = lib.sum_logs(values) + observ_prob
 
-            res = lib.sum_logs(values)
-            bw_table[time - 1][psidx] = res
-
-    return bw_table
+        return fw_table
 
 
-def get_likelihood(forward_table, trans_table, states):
-    values = []
-    for idx in range(len(states)):
-        values.append(forward_table[-1][idx] + forward_table[idx + 1][-1])
-    return lib.sum_logs(values)
+    def calc_backward_table(self):
+        bw_table = []
+        for _ in range(self.vectors_count):
+            bw_table.append([lib.NEG_INF] * self.states_count)
+
+        for sidx in range(self.states_count):
+            bw_table[-1][sidx] = self.pheno_trans_table[sidx + 1][self.states_count + 1]
+
+        for time in range(self.vectors_count - 2, 0, -1):
+            vector = self.vectors[time]
+            for psidx in range(self.states_count):
+                values = []
+                for nsidx, nstate in enumerate(self.states):
+                    trans_prob = self.pheno_trans_table[psidx + 1][nsidx + 1]
+                    observ_prob = nstate.get_observ_prob(vector)
+                    bw_prob = bw_table[time + 1][nsidx]
+                    values.append(trans_prob + bw_prob + observ_prob)
+                bw_table[time - 1][psidx] = lib.sum_logs(values)
+
+        return bw_table
+
+
+    def calc_likelihood(self):
+        values = []
+        for idx in range(self.states_count):
+            values.append(self.forward_table[-1][idx] + self.pheno_trans_table[idx + 1][-1])
+        return lib.sum_logs(values)
 
 
 def main():
     model = hmm_model.parse()
     transcripts = transcript.parse()
 
-    accumulate(model, transcripts)
-    
+    accumulator = Accumulator(model)
+    ts = transcripts[0]
+    print('Accumulating Transcript: {0}'.format(ts.filename))
+    accumulator.process_transcript(ts)
+
 
 if __name__ == '__main__':
     main()
