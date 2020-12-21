@@ -20,7 +20,7 @@ def accumulate(model, transcripts):
 
     model_transition_table = get_model_transition_table(models, len(states))
     vectors = transcript.get_vectors()
-    forward_table = get_forward_table2(states, vectors, model_transition_table)
+    forward_table = get_forward_table(states, vectors, model_transition_table)
 
 
 def get_model_transition_table(models, total_states_count):
@@ -49,7 +49,7 @@ def get_model_transition_table(models, total_states_count):
     return table
 
 
-def get_forward_table2(states, vectors, trans_table):
+def get_forward_table(states, vectors, trans_table):
     fw_table = []
     fw_table.append([])
 
