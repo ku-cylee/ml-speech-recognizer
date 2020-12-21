@@ -62,19 +62,19 @@ class Accumulator:
 
         for sidx, state in enumerate(self.states):
             observ_prob = state.get_observ_prob(self.vectors[0])
-            fw_prob = self.pheno_trans_table[0][sidx] + observ_prob
+            fw_prob = self.pheno_trans_table[0][sidx + 1] + observ_prob
             fw_table[0][sidx] = fw_prob
 
         for time in range(1, self.vectors_count):
             vector = self.vectors[time]
-            for psidx, state in enumerate(self.states):
+            for nsidx, state in enumerate(self.states):
                 values = []
-                for nsidx in range(self.states_count):
-                    fw_prob = fw_table[time - 1][nsidx]
-                    trans_prob = self.pheno_trans_table[nsidx + 1][psidx + 1]
+                for psidx in range(self.states_count):
+                    fw_prob = fw_table[time - 1][psidx]
+                    trans_prob = self.pheno_trans_table[psidx + 1][nsidx + 1]
                     values.append(fw_prob + trans_prob)
                 observ_prob = state.get_observ_prob(vector)
-                fw_table[time][psidx] = lib.sum_logs(values) + observ_prob
+                fw_table[time][nsidx] = lib.sum_logs(values) + observ_prob
 
         return fw_table
 
@@ -85,7 +85,7 @@ class Accumulator:
             bw_table.append([lib.NEG_INF] * self.states_count)
 
         for sidx in range(self.states_count):
-            bw_table[-1][sidx] = self.pheno_trans_table[sidx + 1][self.states_count + 1]
+            bw_table[-1][sidx] = self.pheno_trans_table[sidx + 1][-1]
 
         for time in range(self.vectors_count - 2, 0, -1):
             vector = self.vectors[time]
