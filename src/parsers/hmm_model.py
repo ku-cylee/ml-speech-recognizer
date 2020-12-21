@@ -22,10 +22,6 @@ class State:
         self.mixtures = [Mixture(text.strip()) for text in text_data.split('<MIXTURE>')[1:]]
 
 
-    def get_observation_prob(self, x):
-        return lib.sum_logs(mixture.get_indiv_observation_prob(x) for mixture in self.mixtures)
-
-
 class Mixture:
 
     def __init__(self, text_data):
@@ -50,19 +46,6 @@ class Mixture:
         self.gaussians = [Gaussian(means[i], variances[i]) for i in range(self.dimension)]
 
 
-    def get_indiv_observation_prob(self, vector):
-        log_weight = math.log(self.weight)
-        constant = 0.5 * self.dimension * math.log(2 * math.pi)
-        variances_sum = sum(math.log(gaussian.variance) for gaussian in self.gaussians)
-
-        differences_sum = 0
-        for i in range(self.dimension):
-            gaussian = self.gaussians[i]
-            differences_sum = ((vector[i] - gaussian.mean) / gaussian.variance) ** 2
-            
-        return log_weight - constant - variances_sum - 0.5 * differences_sum
-
-
 class Gaussian:
 
     def __init__(self, mean, variance):
@@ -72,7 +55,8 @@ class Gaussian:
 class TransitionTable:
 
     def __init__(self, text_data):
-        self.probabilities = [[float(prob) for prob in row.strip().split(' ')] for row in text_data.split('\n')[1:-1]]
+        rows = text_data.split('\n')[1:-1]
+        self.probabilities = [[lib.refined_log(float(prob)) for prob in row.strip().split(' ')] for row in rows]
 
 
 def parse():
