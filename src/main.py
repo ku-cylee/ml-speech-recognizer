@@ -18,12 +18,12 @@ def accumulate(model, transcripts):
     for model in models:
         states += model.states
 
-    model_transition_table = get_model_transition_table(models, len(states))
+    pheno_trans_table = get_transcript_transition_table(models, len(states))
     vectors = transcript.get_vectors()
     forward_table = get_forward_table(states, vectors, model_transition_table)
 
 
-def get_model_transition_table(models, total_states_count):
+def get_transcript_transition_table(models, total_states_count):
     table = []
     for _ in range(total_states_count + 2):
         table.append([lib.NEG_INF] * (total_states_count + 2))
@@ -50,8 +50,7 @@ def get_model_transition_table(models, total_states_count):
 
 
 def get_forward_table(states, vectors, trans_table):
-    fw_table = []
-    fw_table.append([])
+    fw_table = [[]]
 
     for sidx, state in enumerate(states):
         observ_prob = get_observation_prob(state, vectors[0])
