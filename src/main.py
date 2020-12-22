@@ -57,31 +57,31 @@ class Accumulator:
 
     def calc_forward_table(self):
         fw_table = []
-        for _ in range(self.vectors_count):
+        for _ in range(self.vectors_count + 1):
             fw_table.append([lib.NEG_INF] * self.states_count)
 
         for sidx, state in enumerate(self.states):
             observ_prob = state.get_observ_prob(self.vectors[0])
             fw_prob = self.pheno_trans_table[0][sidx + 1] + observ_prob
-            fw_table[0][sidx] = fw_prob
+            fw_table[1][sidx] = fw_prob
 
         for time in range(1, self.vectors_count):
             vector = self.vectors[time]
             for nsidx, state in enumerate(self.states):
                 values = []
                 for psidx in range(self.states_count):
-                    fw_prob = fw_table[time - 1][psidx]
+                    fw_prob = fw_table[time][psidx]
                     trans_prob = self.pheno_trans_table[psidx + 1][nsidx + 1]
                     values.append(fw_prob + trans_prob)
                 observ_prob = state.get_observ_prob(vector)
-                fw_table[time][nsidx] = lib.sum_logs(values) + observ_prob
+                fw_table[time + 1][nsidx] = lib.sum_logs(values) + observ_prob
 
         return fw_table
 
 
     def calc_backward_table(self):
         bw_table = []
-        for _ in range(self.vectors_count):
+        for _ in range(self.vectors_count + 1):
             bw_table.append([lib.NEG_INF] * self.states_count)
 
         for sidx in range(self.states_count):
@@ -94,9 +94,9 @@ class Accumulator:
                 for nsidx, nstate in enumerate(self.states):
                     trans_prob = self.pheno_trans_table[psidx + 1][nsidx + 1]
                     observ_prob = nstate.get_observ_prob(vector)
-                    bw_prob = bw_table[time][nsidx]
+                    bw_prob = bw_table[time + 1][nsidx]
                     values.append(trans_prob + bw_prob + observ_prob)
-                bw_table[time - 1][psidx] = lib.sum_logs(values)
+                bw_table[time][psidx] = lib.sum_logs(values)
 
         return bw_table
 
