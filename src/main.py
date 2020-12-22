@@ -20,6 +20,10 @@ class Accumulator:
         self.vectors = transcript.get_vectors()
         self.states_count = len(self.states)
         self.vectors_count = len(self.vectors)
+
+        for state in self.states:
+            state.create_observation_table(self.vectors)
+        print('OBSERVATION TABLE COMPLETE')
         
         self.pheno_trans_table = self.calc_transition_table()
         print('TRANS TABLE COMPLETE')
@@ -63,19 +67,17 @@ class Accumulator:
             fw_table.append([lib.NEG_INF] * self.states_count)
 
         for sidx, state in enumerate(self.states):
-            observ_prob = state.get_observ_prob(self.vectors[0])
-            fw_prob = self.pheno_trans_table[0][sidx + 1] + observ_prob
+            fw_prob = self.pheno_trans_table[0][sidx + 1] + state.observ_probs[0]
             fw_table[0][sidx] = fw_prob
 
         for time in range(1, self.vectors_count):
-            vector = self.vectors[time]
             for nsidx, state in enumerate(self.states):
                 values = []
                 for psidx in range(self.states_count):
                     fw_prob = fw_table[time - 1][psidx]
                     trans_prob = self.pheno_trans_table[psidx + 1][nsidx + 1]
                     values.append(fw_prob + trans_prob)
-                observ_prob = state.get_observ_prob(vector)
+                observ_prob = state.observ_probs[time]
                 fw_table[time][nsidx] = lib.sum_logs(values) + observ_prob
 
         return fw_table
@@ -90,12 +92,11 @@ class Accumulator:
             bw_table[-1][sidx] = self.pheno_trans_table[sidx + 1][-1]
 
         for time in range(self.vectors_count - 1, 0, -1):
-            vector = self.vectors[time]
             for psidx in range(self.states_count):
                 values = []
                 for nsidx, nstate in enumerate(self.states):
                     trans_prob = self.pheno_trans_table[psidx + 1][nsidx + 1]
-                    observ_prob = nstate.get_observ_prob(vector)
+                    observ_prob = nstate.observ_probs[time]
                     bw_prob = bw_table[time][nsidx]
                     values.append(trans_prob + bw_prob + observ_prob)
                 bw_table[time - 1][psidx] = lib.sum_logs(values)
@@ -119,17 +120,16 @@ class Accumulator:
             stocc_table.append(state_row)
 
         for time in range(self.vectors_count):
-            vector = self.vectors[time]
             for sidx, state in enumerate(self.states):
                 forward_prob = self.forward_table[time][sidx]
                 backward_prob = self.backward_table[time][sidx]
                 init_stocc = forward_prob + backward_prob - self.likelihood
                 stocc_table[sidx][0][time] = (init_stocc)
 
-                observ_prob = state.get_observ_prob(vector)
+                observ_prob = state.observ_probs[time]
                 for midx, mixture in enumerate(state.mixtures):
                     weight = mixture.weight
-                    part_observ_prob = mixture.get_indiv_observ_prob(vector)
+                    part_observ_prob = mixture.observ_probs[time]
                     state_occ = init_stocc + weight + part_observ_prob - observ_prob
                     stocc_table[sidx][midx + 1][time] = state_occ
 

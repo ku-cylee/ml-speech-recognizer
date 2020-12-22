@@ -21,8 +21,15 @@ class State:
         self.id = int(text_data.split('\n')[0])
         self.mixtures = [Mixture(text.strip()) for text in text_data.split('<MIXTURE>')[1:]]
 
-    def get_observ_prob(self, vector):
-        return lib.sum_logs([mix.get_indiv_observ_prob(vector) for mix in self.mixtures])
+
+    def create_observation_table(self, vectors):
+        for mixture in self.mixtures:
+            mixture.create_observation_table(vectors)
+
+        self.observ_probs = []
+        for time in range(len(vectors)):
+            probs = [mix.observ_probs[time] for mix in self.mixtures]
+            self.observ_probs.append(lib.sum_logs(probs))
 
 
 class Mixture:
@@ -57,7 +64,11 @@ class Mixture:
         self.param = self.weight - constant - variances_sum
 
 
-    def get_indiv_observ_prob(self, vector):
+    def create_observation_table(self, vectors):
+        self.observ_probs = [self.calc_observ_prob(vector) for vector in vectors]
+
+
+    def calc_observ_prob(self, vector):
         differences_sum = 0
         for idx, gaussian in enumerate(self.gaussians):
             differences_sum += ((vector.values[idx] - gaussian.mean) / gaussian.variance) ** 2
