@@ -55,25 +55,19 @@ class Mixture:
         self.dimension = len(means)
         self.gaussians = [Gaussian(means[i], variances[i]) for i in range(self.dimension)]
 
-        self.calc_params()
-
-
-    def calc_params(self):
-        constant = 0.5 * self.dimension * math.log(2 * math.pi)
-        variances_sum = sum(lib.refined_log(gauss.variance) for gauss in self.gaussians)
-        self.param = self.weight - constant - variances_sum
-
 
     def create_observation_table(self, vectors):
-        self.observ_probs = [self.calc_observ_prob(vector) for vector in vectors]
+        self.observ_probs = []
 
+        gaussian_constant = 0.5 * self.dimension * math.log(2 * math.pi)
+        variances_sum = sum(lib.refined_log(gauss.variance) for gauss in self.gaussians)
+        constant = self.weight - gaussian_constant - variances_sum
 
-    def calc_observ_prob(self, vector):
-        differences_sum = 0
-        for idx, gaussian in enumerate(self.gaussians):
-            differences_sum += ((vector.values[idx] - gaussian.mean) / gaussian.variance) ** 2
-
-        return self.param - 0.5 * differences_sum
+        for vector in vectors:
+            differences_sum = 0
+            for idx, gaussian in enumerate(self.gaussians):
+                differences_sum += ((vector.values[idx] - gaussian.mean) / gaussian.variance) ** 2
+            self.observ_probs.append(constant - 0.5 * differences_sum)
 
 
 class Gaussian:

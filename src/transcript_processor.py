@@ -138,13 +138,17 @@ class TranscriptProcessor:
 
         for time in range(1, self.vectors_count - 1):
             for psidx in range(self.states_count):
-                fw_prob = self.forward_table[time][psidx]
+                constant = self.forward_table[time][psidx] - self.likelihood
                 for nsidx, nstate in enumerate(self.states):
                     trans_prob = self.pheno_trans_table[psidx + 1][nsidx + 1]
                     observ_prob = nstate.observ_probs[time + 1]
                     bw_prob = self.backward_table[time + 1][nsidx]
-                    arc_occup = fw_prob + trans_prob + observ_prob + bw_prob - self.likelihood
+                    arc_occup = constant + trans_prob + observ_prob + bw_prob
                     old_prob = new_trans_table[psidx + 1][nsidx + 1]
                     new_trans_table[psidx + 1][nsidx + 1] = lib.sum_logs([old_prob, arc_occup])
 
         return new_trans_table
+
+
+    def apply_new_trans_table(self, trans_table):
+        pass
