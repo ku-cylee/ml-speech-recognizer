@@ -8,6 +8,10 @@ class TranscriptProcessor:
         self.models = models
         for model in self.models.values():
             model.create_new_transition_table()
+            for state in model.states:
+                for mixture in state.mixtures:
+                    for gaussian in mixture.gaussians:
+                        gaussian.set_new_params()
 
 
     def process(self, transcript):
@@ -203,5 +207,5 @@ class TranscriptProcessor:
         for midx, mixture in enumerate(mixtures):
             state_occup = math.exp(self.time_state_occup_table[sidx][midx + 1][time])
             for gidx, gaussian in enumerate(mixture.gaussians):
-                gaussian.mean += state_occup * vector.values[gidx]
-                gaussian.variance += state_occup * (vector.values[gidx] ** 2)
+                gaussian.new_mean += state_occup * vector.values[gidx]
+                gaussian.new_variance += state_occup * (vector.values[gidx] ** 2)

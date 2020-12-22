@@ -83,12 +83,9 @@ class Gaussian:
         self.variance = variance
 
 
-    def add_mean(self, log_value):
-        self.mean += math.exp(log_value)
-
-
-    def add_variance(self, log_value):
-        self.mean += math.exp(log_value)
+    def set_new_params(self):
+        self.new_mean = 0
+        self.new_variance = 0
 
 
 class TransitionTable:
