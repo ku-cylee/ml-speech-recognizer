@@ -60,7 +60,7 @@ class Mixture:
         self.observ_probs = []
 
         gaussian_constant = 0.5 * self.dimension * math.log(2 * math.pi)
-        variances_sum = sum(lib.refined_log(gauss.variance) for gauss in self.gaussians)
+        variances_sum = 0.5 * sum(lib.refined_log(gauss.variance) for gauss in self.gaussians)
         constant = self.weight - gaussian_constant - variances_sum
 
         for vector in vectors:
@@ -75,6 +75,15 @@ class Gaussian:
     def __init__(self, mean, variance):
         self.mean = mean
         self.variance = variance
+
+
+    def add_mean(self, log_value):
+        self.mean += math.exp(log_value)
+
+
+    def add_variance(self, log_value):
+        self.mean += math.exp(log_value)
+
 
 class TransitionTable:
 

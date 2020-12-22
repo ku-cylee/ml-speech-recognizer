@@ -26,6 +26,7 @@ class TranscriptProcessor:
         print('PARAMETERS CALCULATION COMPLETE')
 
         new_trans_table = self.calc_new_trans_table()
+        self.apply_new_gaussians()
 
 
     def calc_transition_table(self):
@@ -150,5 +151,17 @@ class TranscriptProcessor:
         return new_trans_table
 
 
-    def apply_new_trans_table(self, trans_table):
-        pass
+    def apply_new_gaussians(self):
+        for time in range(self.vectors_count):
+            for sidx, state in enumerate(self.states):
+                self.apply_new_gaussians_per_state(state.mixtures, sidx, time)
+
+    
+    def apply_new_gaussians_per_state(self, mixtures, sidx, time):
+        vector = self.vectors[time]
+        for midx, mixture in enumerate(mixtures):
+            state_occup = self.time_state_occup_table[sidx][midx + 1][time]
+            for gidx, gaussian in enumerate(mixture.gaussians):
+                gaussian.add_mean(state_occup + vector.values[gidx])
+                gaussian.add_variance(state_occup + vector.values[gidx] ** 2)
+
