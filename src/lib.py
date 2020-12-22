@@ -15,3 +15,8 @@ def sum_logs(values):
 
     max_value = max(filtered_values)
     return max_value + math.log(sum(math.exp(value - max_value) for value in filtered_values))
+
+
+def get_remaining_prob(probs):
+    probs_sum = sum_logs(probs)
+    return refined_log(1 - math.exp(probs_sum))

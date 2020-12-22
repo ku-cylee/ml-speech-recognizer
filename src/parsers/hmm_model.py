@@ -13,6 +13,12 @@ class PhenomenonModel:
         text_splitted = state_splitted[1:-1] + state_splitted[-1].split('<TRANSP>')
         self.states = [State(text.strip()) for text in text_splitted[:-1]]
         self.transition_table = TransitionTable(text_splitted[-1].strip())
+
+    
+    def create_new_transition_table(self):
+        self.new_table = []
+        for _ in range(len(self.states) + 2):
+            self.new_table.append([lib.NEG_INF] * (len(self.states) + 2))
         
 
 class State:

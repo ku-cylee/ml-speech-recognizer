@@ -4,12 +4,14 @@ import lib
 
 class TranscriptProcessor:
 
-    def __init__(self, model):
-        self.model = model
+    def __init__(self, models):
+        self.models = models
+        for model in self.models.values():
+            model.create_new_transition_table()
 
 
     def process(self, transcript):
-        self.transcript_models = [self.model[mp] for mp in transcript.monophones]
+        self.transcript_models = [self.models[mp] for mp in transcript.monophones]
         self.states = []
         for model in self.transcript_models:
             self.states += model.states
@@ -25,9 +27,9 @@ class TranscriptProcessor:
         self.backward_table = self.calc_backward_table()
         self.likelihood = self.calc_likelihood()
         self.time_state_occup_table = self.calc_time_state_occupancy()
-        print('PARAMETERS CALCULATION COMPLETE')
 
         new_trans_table = self.calc_new_trans_table()
+        self.apply_new_trans_table(new_trans_table)
         self.apply_new_gaussians()
 
 
@@ -171,6 +173,23 @@ class TranscriptProcessor:
             arc_occup = constant + trans_prob + observ_prob + bw_prob
             old_prob = table[psidx + 1][nsidx + 1]
             table[psidx + 1][nsidx + 1] = lib.sum_logs([old_prob, arc_occup])
+
+
+    def apply_new_trans_table(self, new_table):
+        cursor = 0
+        exit_prob = 0
+        for model in self.transcript_models:
+            states_count = len(model.states)
+
+            for nsidx in range(1, states_count + 2):
+                prob = self.pheno_trans_table[cursor][cursor + nsidx] - exit_prob
+
+            for psidx in range(1, states_count + 1):
+                for nsidx in range(1, states_count + 2):
+                    prob = self.pheno_trans_table[cursor + psidx][cursor + nsidx]
+                    model.new_table[psidx][nsidx] = prob
+            last_state_probs = model.new_table[-2][1:-2]
+            exit_prob = lib.get_remaining_prob(last_state_probs)
 
 
     def apply_new_gaussians(self):
