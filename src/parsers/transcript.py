@@ -1,7 +1,6 @@
 import re
 
 from config import TRANSCRIPT_PATH
-from exceptions import FileParsingFailureException
 from parsers import vectors
 
 PTR = re.compile(r'"(trn/.+/.+/.+\.lab)"\n([\w\n]+\.)')
@@ -18,11 +17,8 @@ class Transcript:
 
 
 def parse():
-    try:
-        with open(TRANSCRIPT_PATH, 'r') as f:
-            content = f.read()
+    with open(TRANSCRIPT_PATH, 'r') as f:
+        content = f.read()
 
-        transcripts = [Transcript(match) for match in PTR.finditer(content)]
-        return transcripts
-    except:
-        raise FileParsingFailureException('Vector', file_path)
+    transcripts = [Transcript(match) for match in PTR.finditer(content)]
+    return transcripts

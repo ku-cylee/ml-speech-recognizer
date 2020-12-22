@@ -3,7 +3,6 @@ import math
 import lib
 
 from config import HMM_PATH
-from exceptions import FileParsingFailureException
 
 class PhenomenonModel:
 
