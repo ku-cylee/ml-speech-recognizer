@@ -28,6 +28,8 @@ class Accumulator:
         self.backward_table = self.calc_backward_table()
         print('BACKWARD TABLE COMPLETE')
         self.likelihood = self.calc_likelihood()
+        self.time_state_occupancy_table = self.calc_time_state_occupancy()
+        print('STATE OCCUPANCY TABLE COMPLETE')
 
 
     def calc_transition_table(self):
@@ -106,6 +108,32 @@ class Accumulator:
         for idx in range(self.states_count):
             values.append(self.forward_table[-1][idx] + self.pheno_trans_table[idx + 1][-1])
         return lib.sum_logs(values)
+
+
+    def calc_time_state_occupancy(self):
+        stocc_table = []
+        for state in self.states:
+            state_row = []
+            for _ in range(len(state.mixtures) + 1):
+                state_row.append([lib.NEG_INF] * self.vectors_count)
+            stocc_table.append(state_row)
+
+        for time in range(self.vectors_count):
+            vector = self.vectors[time]
+            for sidx, state in enumerate(self.states):
+                forward_prob = self.forward_table[time][sidx]
+                backward_prob = self.backward_table[time][sidx]
+                init_stocc = forward_prob + backward_prob - self.likelihood
+                stocc_table[sidx][0][time] = (init_stocc)
+
+                observ_prob = state.get_observ_prob(vector)
+                for midx, mixture in enumerate(state.mixtures):
+                    weight = mixture.weight
+                    part_observ_prob = mixture.get_indiv_observ_prob(vector)
+                    state_occ = init_stocc + weight + part_observ_prob - observ_prob
+                    stocc_table[sidx][midx + 1][time] = state_occ
+
+        return stocc_table
 
 
 def main():
