@@ -15,6 +15,12 @@ class TranscriptProcessor:
 
 
     def process(self, transcript):
+        self.init_per_transcript(transcript)
+        self.calculate_parameters()
+        self.apply_changed_values()
+
+
+    def init_per_transcript(self, transcript):
         self.transcript_models = [self.models[mp] for mp in transcript.monophones]
         self.states = []
         for model in self.transcript_models:
@@ -24,15 +30,18 @@ class TranscriptProcessor:
         self.vectors_count = len(self.vectors)
         self.create_state_occupancy_table()
 
+
+    def calculate_parameters(self):
         for state in self.states:
             state.create_observation_table(self.vectors)
-        
         self.pheno_trans_table = self.calc_transition_table()
         self.forward_table = self.calc_forward_table()
         self.backward_table = self.calc_backward_table()
         self.likelihood = self.calc_likelihood()
         self.time_state_occup_table = self.calc_state_occupancy()
 
+
+    def apply_changed_values(self):
         new_trans_table = self.calc_new_trans_table()
         self.apply_new_trans_table(new_trans_table)
         self.apply_new_gaussians()
@@ -50,23 +59,24 @@ class TranscriptProcessor:
             table.append([lib.NEG_INF] * (self.states_count + 2))
 
         cursor = 0
-        table[0][1] = 0
         for model in self.transcript_models:
-            states_count = len(model.states)
-            trans_table = model.transition_table.probabilities
-
-            for j in range(1, states_count + 2):
-                previous_prob = table[cursor][cursor + 1]
-                table[cursor][cursor + j] = previous_prob + trans_table[0][j]
-
-            for i in range(1, states_count + 2):
-                for j in range(1, states_count + 2):
-                    table[cursor + i][cursor + j] = trans_table[i][j]
-
-            cursor += states_count
-
-        table[-2][-1] = 0
+            cursor += self.calc_trans_table_per_model(table, model, cursor)
         return table
+
+
+    def calc_trans_table_per_model(self, table, model, cursor):
+        states_count = len(model.states)
+        trans_table = model.transition_table.probabilities
+
+        for j in range(1, states_count + 2):
+            previous_prob = table[cursor][cursor + 1]
+            table[cursor][cursor + j] = previous_prob + trans_table[0][j]
+
+        for i in range(1, states_count + 2):
+            for j in range(1, states_count + 2):
+                table[cursor + i][cursor + j] = trans_table[i][j]
+
+        return states_count
 
 
     def calc_forward_table(self):
@@ -141,12 +151,7 @@ class TranscriptProcessor:
             for sidx in range(self.states_count):
                 self.calc_state_occupancy_per_state(stocc_table, time, sidx)
 
-        for sidx in range(self.states_count):
-            state = self.states[sidx]
-            for midx in range(len(state.mixtures) + 1):
-                prob_sum = lib.sum_logs(stocc_table[sidx][midx])
-                self.state_occupancy_table[sidx][midx] = prob_sum
-
+        self.accumulate_state_occupancy(stocc_table)
         return stocc_table
 
 
@@ -166,13 +171,24 @@ class TranscriptProcessor:
             table[sidx][midx + 1][time] = state_occ
 
 
+    def accumulate_state_occupancy(self, stocc_table):
+        for sidx in range(self.states_count):
+            state = self.states[sidx]
+            for midx in range(len(state.mixtures) + 1):
+                state_occupancy = self.state_occupancy_table[sidx][midx]
+                prob_sum = lib.sum_logs(stocc_table[sidx][midx] + [state_occupancy])
+                self.state_occupancy_table[sidx][midx] = prob_sum
+
+
     def calc_new_trans_table(self):
         new_trans_table = []
         for _ in range(self.states_count + 2):
             new_trans_table.append([lib.NEG_INF] * (self.states_count + 2))
 
         for sidx in range(self.states_count):
-            new_trans_table[0][sidx + 1] = self.time_state_occup_table[sidx][0][0]
+            trans_prob = new_trans_table[0][sidx + 1]
+            state_occup_prob = self.time_state_occup_table[sidx][0][0]
+            new_trans_table[0][sidx + 1] = lib.sum_logs([trans_prob, state_occup_prob])
 
         for time in range(1, self.vectors_count - 1):
             for psidx in range(self.states_count):
