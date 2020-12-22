@@ -1,3 +1,5 @@
+import math
+
 import lib
 
 class TranscriptProcessor:
@@ -64,16 +66,22 @@ class TranscriptProcessor:
             fw_table[0][sidx] = fw_prob
 
         for time in range(1, self.vectors_count):
-            for nsidx, state in enumerate(self.states):
-                values = []
-                for psidx in range(self.states_count):
-                    fw_prob = fw_table[time - 1][psidx]
-                    trans_prob = self.pheno_trans_table[psidx + 1][nsidx + 1]
-                    values.append(fw_prob + trans_prob)
-                observ_prob = state.observ_probs[time]
-                fw_table[time][nsidx] = lib.sum_logs(values) + observ_prob
+            for nsidx in range(self.states_count):
+                self.calc_forward_per_state(fw_table, time, nsidx)
 
         return fw_table
+
+
+    def calc_forward_per_state(self, table, time, nsidx):
+        nstate = self.states[nsidx]
+
+        values = []
+        for psidx in range(self.states_count):
+            fw_prob = table[time - 1][psidx]
+            trans_prob = self.pheno_trans_table[psidx + 1][nsidx + 1]
+            values.append(fw_prob + trans_prob)
+        observ_prob = nstate.observ_probs[time]
+        table[time][nsidx] = lib.sum_logs(values) + observ_prob
 
 
     def calc_backward_table(self):
@@ -86,15 +94,19 @@ class TranscriptProcessor:
 
         for time in range(self.vectors_count - 1, 0, -1):
             for psidx in range(self.states_count):
-                values = []
-                for nsidx, nstate in enumerate(self.states):
-                    trans_prob = self.pheno_trans_table[psidx + 1][nsidx + 1]
-                    observ_prob = nstate.observ_probs[time]
-                    bw_prob = bw_table[time][nsidx]
-                    values.append(trans_prob + bw_prob + observ_prob)
-                bw_table[time - 1][psidx] = lib.sum_logs(values)
+                self.calc_backward_per_state(bw_table, time, psidx)
 
         return bw_table
+
+
+    def calc_backward_per_state(self, table, time, psidx):
+        values = []
+        for nsidx, nstate in enumerate(self.states):
+            trans_prob = self.pheno_trans_table[psidx + 1][nsidx + 1]
+            observ_prob = nstate.observ_probs[time]
+            bw_prob = table[time][nsidx]
+            values.append(trans_prob + bw_prob + observ_prob)
+        table[time - 1][psidx] = lib.sum_logs(values)
 
 
     def calc_likelihood(self):
@@ -113,20 +125,26 @@ class TranscriptProcessor:
             stocc_table.append(state_row)
 
         for time in range(self.vectors_count):
-            for sidx, state in enumerate(self.states):
-                forward_prob = self.forward_table[time][sidx]
-                backward_prob = self.backward_table[time][sidx]
-                init_stocc = forward_prob + backward_prob - self.likelihood
-                stocc_table[sidx][0][time] = (init_stocc)
-
-                observ_prob = state.observ_probs[time]
-                for midx, mixture in enumerate(state.mixtures):
-                    weight = mixture.weight
-                    part_observ_prob = mixture.observ_probs[time]
-                    state_occ = init_stocc + weight + part_observ_prob - observ_prob
-                    stocc_table[sidx][midx + 1][time] = state_occ
+            for sidx in range(self.states_count):
+                self.calc_state_occupancy_per_state(stocc_table, time, sidx)
 
         return stocc_table
+
+
+    def calc_state_occupancy_per_state(self, table, time, sidx):
+        state = self.states[sidx]
+
+        forward_prob = self.forward_table[time][sidx]
+        backward_prob = self.backward_table[time][sidx]
+        init_occupancy = forward_prob + backward_prob - self.likelihood
+        table[sidx][0][time] = init_occupancy
+
+        observ_prob = state.observ_probs[time]
+        for midx, mixture in enumerate(state.mixtures):
+            weight = mixture.weight
+            part_observ_prob = mixture.observ_probs[time]
+            state_occ = init_occupancy + weight + part_observ_prob - observ_prob
+            table[sidx][midx + 1][time] = state_occ
 
 
     def calc_new_trans_table(self):
@@ -139,16 +157,20 @@ class TranscriptProcessor:
 
         for time in range(1, self.vectors_count - 1):
             for psidx in range(self.states_count):
-                constant = self.forward_table[time][psidx] - self.likelihood
-                for nsidx, nstate in enumerate(self.states):
-                    trans_prob = self.pheno_trans_table[psidx + 1][nsidx + 1]
-                    observ_prob = nstate.observ_probs[time + 1]
-                    bw_prob = self.backward_table[time + 1][nsidx]
-                    arc_occup = constant + trans_prob + observ_prob + bw_prob
-                    old_prob = new_trans_table[psidx + 1][nsidx + 1]
-                    new_trans_table[psidx + 1][nsidx + 1] = lib.sum_logs([old_prob, arc_occup])
+                self.calc_new_trans_per_state(new_trans_table, time, psidx)
 
         return new_trans_table
+
+
+    def calc_new_trans_per_state(self, table, time, psidx):
+        constant = self.forward_table[time][psidx] - self.likelihood
+        for nsidx, nstate in enumerate(self.states):
+            trans_prob = self.pheno_trans_table[psidx + 1][nsidx + 1]
+            observ_prob = nstate.observ_probs[time + 1]
+            bw_prob = self.backward_table[time + 1][nsidx]
+            arc_occup = constant + trans_prob + observ_prob + bw_prob
+            old_prob = table[psidx + 1][nsidx + 1]
+            table[psidx + 1][nsidx + 1] = lib.sum_logs([old_prob, arc_occup])
 
 
     def apply_new_gaussians(self):
@@ -160,8 +182,7 @@ class TranscriptProcessor:
     def apply_new_gaussians_per_state(self, mixtures, sidx, time):
         vector = self.vectors[time]
         for midx, mixture in enumerate(mixtures):
-            state_occup = self.time_state_occup_table[sidx][midx + 1][time]
+            state_occup = math.exp(self.time_state_occup_table[sidx][midx + 1][time])
             for gidx, gaussian in enumerate(mixture.gaussians):
-                gaussian.add_mean(state_occup + vector.values[gidx])
-                gaussian.add_variance(state_occup + vector.values[gidx] ** 2)
-
+                gaussian.mean += state_occup * vector.values[gidx]
+                gaussian.variance += state_occup * (vector.values[gidx] ** 2)
