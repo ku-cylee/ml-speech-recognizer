@@ -23,17 +23,15 @@ class Accumulator:
 
         for state in self.states:
             state.create_observation_table(self.vectors)
-        print('OBSERVATION TABLE COMPLETE')
         
         self.pheno_trans_table = self.calc_transition_table()
-        print('TRANS TABLE COMPLETE')
         self.forward_table = self.calc_forward_table()
-        print('FORWARD TABLE COMPLETE')
         self.backward_table = self.calc_backward_table()
-        print('BACKWARD TABLE COMPLETE')
         self.likelihood = self.calc_likelihood()
-        self.time_state_occupancy_table = self.calc_time_state_occupancy()
-        print('STATE OCCUPANCY TABLE COMPLETE')
+        self.time_state_occup_table = self.calc_time_state_occupancy()
+        print('PARAMETERS CALCULATION COMPLETE')
+
+        new_trans_table = self.calc_new_trans_table()
 
 
     def calc_transition_table(self):
@@ -134,6 +132,28 @@ class Accumulator:
                     stocc_table[sidx][midx + 1][time] = state_occ
 
         return stocc_table
+
+
+    def calc_new_trans_table(self):
+        new_trans_table = []
+        for _ in range(self.states_count + 2):
+            new_trans_table.append([lib.NEG_INF] * (self.states_count + 2))
+
+        for sidx in range(self.states_count):
+            new_trans_table[0][sidx + 1] = self.time_state_occup_table[sidx][0][0]
+
+        for time in range(1, self.vectors_count - 1):
+            for psidx in range(self.states_count):
+                fw_prob = self.forward_table[time][psidx]
+                for nsidx, nstate in enumerate(self.states):
+                    trans_prob = self.pheno_trans_table[psidx + 1][nsidx + 1]
+                    observ_prob = nstate.observ_probs[time + 1]
+                    bw_prob = self.backward_table[time + 1][nsidx]
+                    arc_occup = fw_prob + trans_prob + observ_prob + bw_prob - self.likelihood
+                    old_prob = new_trans_table[psidx + 1][nsidx + 1]
+                    new_trans_table[psidx + 1][nsidx + 1] = lib.sum_logs([old_prob, arc_occup])
+
+        return new_trans_table
 
 
 def main():
