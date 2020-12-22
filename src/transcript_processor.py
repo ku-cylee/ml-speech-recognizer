@@ -59,24 +59,25 @@ class TranscriptProcessor:
             table.append([lib.NEG_INF] * (self.states_count + 2))
 
         cursor = 0
+        prev_prob = 0
         for model in self.transcript_models:
-            cursor += self.calc_trans_table_per_model(table, model, cursor)
+            prev_prob = self.calc_trans_table_per_model(table, model, cursor, prev_prob)
+            cursor += len(model.states)
         return table
 
 
-    def calc_trans_table_per_model(self, table, model, cursor):
+    def calc_trans_table_per_model(self, table, model, cursor, prev_prob):
         states_count = len(model.states)
         trans_table = model.transition_table.probabilities
 
         for j in range(1, states_count + 2):
-            previous_prob = table[cursor][cursor + 1]
-            table[cursor][cursor + j] = previous_prob + trans_table[0][j]
+            table[cursor][cursor + j] = prev_prob + trans_table[0][j]
 
         for i in range(1, states_count + 2):
             for j in range(1, states_count + 2):
                 table[cursor + i][cursor + j] = trans_table[i][j]
 
-        return states_count
+        return trans_table[-2][-1]
 
 
     def calc_forward_table(self):
