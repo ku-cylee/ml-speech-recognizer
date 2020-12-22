@@ -22,6 +22,7 @@ class TranscriptProcessor:
         self.vectors = transcript.get_vectors()
         self.states_count = len(self.states)
         self.vectors_count = len(self.vectors)
+        self.create_state_occupancy_table()
 
         for state in self.states:
             state.create_observation_table(self.vectors)
@@ -30,11 +31,17 @@ class TranscriptProcessor:
         self.forward_table = self.calc_forward_table()
         self.backward_table = self.calc_backward_table()
         self.likelihood = self.calc_likelihood()
-        self.time_state_occup_table = self.calc_time_state_occupancy()
+        self.time_state_occup_table = self.calc_state_occupancy()
 
         new_trans_table = self.calc_new_trans_table()
         self.apply_new_trans_table(new_trans_table)
         self.apply_new_gaussians()
+
+
+    def create_state_occupancy_table(self):
+        self.state_occupancy_table = []
+        for state in self.states:
+            self.state_occupancy_table.append([lib.NEG_INF] * (len(state.mixtures) + 1))
 
 
     def calc_transition_table(self):
@@ -122,7 +129,7 @@ class TranscriptProcessor:
         return lib.sum_logs(values)
 
 
-    def calc_time_state_occupancy(self):
+    def calc_state_occupancy(self):
         stocc_table = []
         for state in self.states:
             state_row = []
@@ -133,6 +140,12 @@ class TranscriptProcessor:
         for time in range(self.vectors_count):
             for sidx in range(self.states_count):
                 self.calc_state_occupancy_per_state(stocc_table, time, sidx)
+
+        for sidx in range(self.states_count):
+            state = self.states[sidx]
+            for midx in range(len(state.mixtures) + 1):
+                prob_sum = lib.sum_logs(stocc_table[sidx][midx])
+                self.state_occupancy_table[sidx][midx] = prob_sum
 
         return stocc_table
 
